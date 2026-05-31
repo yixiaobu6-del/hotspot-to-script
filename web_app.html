@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>热点脚本大纲编辑器</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+    <!-- 热点数据源 -->
+    <script src="data/hotspot_data.js"></script>
+    <style>
+        :root { --primary: #7c3aed; --primary-light: #ede9fe; }
+        * { box-sizing: border-box; }
+        body { background: #f8fafc; }
+        .gradient-header { background: linear-gradient(135deg, #1e1b4b 0%, #3730a3 50%, #4f46e5 100%); }
+        .gradient-btn { background: linear-gradient(135deg, #7c3aed, #4f46e5); }
+        .gradient-btn:hover { background: linear-gradient(135deg, #6d28d9, #4338ca); }
+        .gradient-orange { background: linear-gradient(135deg, #f97316, #ef4444); }
+        .card { background: #fff; border-radius: 16px; box-shadow: 0 1px 3px rgba(0,0,0,.08),0 1px 2px rgba(0,0,0,.06); transition: box-shadow .2s; }
+        .card:hover { box-shadow: 0 10px 25px rgba(0,0,0,.1); }
+        .template-card { border: 2px solid transparent; cursor: pointer; transition: all .2s; }
+        .template-card:hover { border-color: #7c3aed; background: #f5f3ff; }
+        .template-card.active { border-color: #7c3aed; background: #ede9fe; }
+        .hook-badge { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+        .outline-paragraph { border-left: 3px solid #7c3aed; padding-left: 12px; margin-bottom: 12px; }
+        .outline-paragraph.editing { border-left-color: #f59e0b; background: #fffbeb; }
+        .editable:focus { outline: none; background: #fefce8; border-bottom: 2px solid #f59e0b; }
+        .toast { position: fixed; bottom: 24px; right: 24px; z-index: 999; animation: slideUp .3s ease; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .tab-btn { transition: all .2s; white-space: nowrap; }
+        .tab-btn.active { background: #7c3aed; color: #fff; }
+        .fade-in { animation: fadeIn .35s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .ql-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
+        .ql-item { padding: 10px 14px; background: #f5f3ff; border-radius: 10px; cursor: pointer; transition: all .15s; font-size: 14px; }
+        .ql-item:hover { background: #7c3aed; color: #fff; transform: translateY(-1px); }
+        .section-collapse { transition: max-height .3s ease, opacity .2s ease; overflow: hidden; }
+        .section-collapse.collapsed { max-height: 0 !important; opacity: 0; padding-top: 0 !important; padding-bottom: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .btn-icon { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; border-radius: 10px; font-weight: 600; font-size: 14px; transition: all .15s; cursor: pointer; }
+        .btn-icon:hover { transform: translateY(-1px); }
+    </style>
+</head>
+<body>
+
+<!-- ========== 顶部导航 ========== -->
+<header class="gradient-header text-white">
+    <div class="max-w-6xl mx-auto px-4 py-6 flex items-center justify-between">
+        <div>
+            <h1 class="text-3xl font-bold flex items-center gap-3">
+                <i class="fa fa-fire text-orange-300"></i>
+                热点脚本大纲编辑器
+            </h1>
+            <p class="text-indigo-200 text-sm mt-1">基于内置模板库，一键生成结构化的短视频脚本大纲</p>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="clearAll()" class="btn-icon bg-white/10 hover:bg-white/20 text-white text-sm">
+                <i class="fa fa-trash-o"></i> 清空
+            </button>
+            <button onclick="showHistory()" class="btn-icon bg-white/10 hover:bg-white/20 text-white text-sm">
+                <i class="fa fa-history"></i> 历史
+            </button>
+        </div>
+    </div>
+</header>
+
+<main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+    <!-- ========== 一、热点输入区 ========== -->
+    <section class="card p-6" id="inputSection">
+        <h2 class="text-xl font-bold text-gray-800 mb-5 flex items-center gap-2">
+            <i class="fa fa-pencil-square-o text-purple-600"></i> 热点输入
+            <span class="text-xs text-gray-400 font-normal ml-2">填写热点信息，自动匹配最佳脚本结构</span>
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <!-- 热点标题 -->
+            <div class="md:col-span-2 lg:col-span-2">
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+                    <i class="fa fa-lightbulb-o text-yellow-500 mr-1"></i> 热点标题
+                </label>
+                <div class="flex gap-2">
+                    <input type="text" id="topicInput" placeholder="例如：年轻人开始反向消费、AI替代人工引发焦虑…"
+                        class="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all text-base">
+                    <button onclick="fillInspire()" class="px-4 py-2.5 bg-gradient-to-r from-orange-400 to-pink-500 text-white rounded-xl hover:shadow-lg transition-all font-medium text-sm whitespace-nowrap">
+                        <i class="fa fa-magic mr-1"></i> 随机灵感
+                    </button>
+                </div>
+            </div>
+
+            <!-- 一句话核心观点 -->
+            <div class="md:col-span-1 lg:col-span-1">
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+                    <i class="fa fa-quote-left text-purple-500 mr-1"></i> 核心观点 <span class="text-gray-400 font-normal">(一句话)</span>
+                </label>
+                <input type="text" id="viewpointInput" placeholder="你想表达的核心看法…"
+                    class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none transition-all text-base">
+            </div>
+
+            <!-- 热点类型 -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+                    <i class="fa fa-tag text-blue-500 mr-1"></i> 热点类型
+                </label>
+                <select id="typeSelect" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none bg-white">
+                    <option value="社会事件">社会事件</option>
+                    <option value="行业动态">行业动态</option>
+                    <option value="娱乐八卦">娱乐八卦</option>
+                    <option value="科技突破">科技突破</option>
+                    <option value="生活方式" selected>生活方式</option>
+                </select>
+            </div>
+
+            <!-- 目标平台 -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+                    <i class="fa fa-mobile text-green-500 mr-1"></i> 目标平台
+                </label>
+                <select id="platformSelect" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none bg-white">
+                    <option value="抖音">抖音</option>
+                    <option value="视频号">视频号</option>
+                    <option value="B站" selected>B站</option>
+                    <option value="小红书">小红书</option>
+                    <option value="快手">快手</option>
+                </select>
+            </div>
+
+            <!-- 目标受众 -->
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">
+                    <i class="fa fa-users text-indigo-500 mr-1"></i> 目标受众
+                </label>
+                <select id="audienceSelect" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none bg-white">
+                    <option value="大众">大众</option>
+                    <option value="年轻人" selected>年轻人</option>
+                    <option value="职场人">职场人</option>
+                    <option value="宝妈">宝妈</option>
+                    <option value="创业者">创业者</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- 生成按钮 -->
+        <div class="mt-6 pt-4 border-t border-gray-100 flex justify-center">
+            <button onclick="generateOutline()" class="px-10 py-3 gradient-btn text-white font-bold text-lg rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:scale-[1.02] active:scale-[0.98]">
+                <i class="fa fa-magic mr-2"></i> 生成脚本大纲
+            </button>
+        </div>
+    </section>
+
+    <!-- ========== 二、模板选择区 ========== -->
+    <section class="card p-6" id="templateSection">
+        <h2 class="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <i class="fa fa-th-large text-purple-600"></i> 脚本结构模板
+            <span class="text-sm font-normal text-gray-400 ml-1">— 自动匹配了 <span id="matchReason" class="text-purple-600 font-semibold"></span></span>
+        </h2>
+        <p class="text-sm text-gray-500 mb-4">也可点击下方模板手动切换</p>
+        <div id="templateGrid" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <!-- 由 JS 动态渲染 -->
+        </div>
+    </section>
+
+    <!-- ========== 系列视频规划区 ========== -->
+    <section class="card p-6" id="seriesSection">
+        <h2 class="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <i class="fa fa-film text-purple-600"></i> 系列视频规划
+            <span class="text-sm font-normal text-gray-400 ml-1">— 一个热点生成多期系列脚本</span>
+        </h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">系列期数</label>
+                <select id="seriesCount" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none bg-white">
+                    <option value="3">3期系列</option>
+                    <option value="4" selected>4期系列</option>
+                    <option value="5">5期系列</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-semibold text-gray-700 mb-1.5">系列主题侧重</label>
+                <select id="seriesFocus" class="w-full px-4 py-2.5 border border-gray-200 rounded-xl focus:border-purple-500 focus:ring-2 focus:ring-purple-100 outline-none bg-white">
+                    <option value="认知">认知篇 — 从认知到行动</option>
+                    <option value="故事">故事篇 — 叙事化展开</option>
+                    <option value="实战">实战篇 — 实操指南</option>
+                    <option value="深度">深度篇 — 层层递进</option>
+                    <option value="争议">争议篇 — 多角度碰撞</option>
+                </select>
+            </div>
+        </div>
+        <button onclick="generateSeries()" class="w-full gradient-btn text-white py-3 rounded-2xl font-bold shadow-lg hover:shadow-xl transition-all">
+            <i class="fa fa-film mr-2"></i> 生成系列规划
+        </button>
+        <div id="seriesOutput" class="mt-4 hidden space-y-3"></div>
+    </section>
+
+    <!-- ========== 三、大纲输出区 ========== -->
+    <section id="outputSection" class="hidden space-y-6">
+
+        <!-- 操作栏 -->
+        <div class="flex flex-wrap items-center justify-between gap-3">
+            <h2 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <i class="fa fa-file-text-o text-purple-600"></i> 脚本大纲
+                <span id="templateNameTag" class="ml-2 text-sm font-normal bg-purple-100 text-purple-700 px-3 py-0.5 rounded-full"></span>
+                <span id="platformTag" class="ml-2 text-sm font-normal bg-blue-100 text-blue-700 px-3 py-0.5 rounded-full hidden"></span>
+            </h2>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="copyOutline()" class="btn-icon bg-gray-100 hover:bg-gray-200 text-gray-700">
+                    <i class="fa fa-copy"></i> 一键复制
+                </button>
+                <button onclick="exportMarkdown()" class="btn-icon bg-gray-100 hover:bg-gray-200 text-gray-700">
+                    <i class="fa fa-file-code-o"></i> 导出 Markdown
+                </button>
+                <button onclick="saveDraft()" class="btn-icon bg-purple-100 hover:bg-purple-200 text-purple-700">
+                    <i class="fa fa-save"></i> 保存草稿
+                </button>
+            </div>
+        </div>
+
+        <!-- ===== 标题方案 ===== -->
+        <div class="card p-5 fade-in">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa fa-header text-orange-500"></i> 标题方案
+                </h3>
+                <button onclick="regenerateTitles()" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                    <i class="fa fa-refresh mr-1"></i> 换一批
+                </button>
+            </div>
+            <div id="titleList" class="space-y-2">
+                <!-- 由 JS 渲染 -->
+            </div>
+        </div>
+
+        <!-- ===== 开头钩子 ===== -->
+        <div class="card p-5 fade-in">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa fa-bullhorn text-red-500"></i> 开头钩子
+                </h3>
+                <button onclick="regenerateHooks()" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                    <i class="fa fa-refresh mr-1"></i> 换一批
+                </button>
+            </div>
+            <div id="hookList" class="space-y-2">
+                <!-- 由 JS 渲染 -->
+            </div>
+        </div>
+
+        <!-- ===== 正文结构（可编辑） ===== -->
+        <div class="card p-5 fade-in">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa fa-list-alt text-blue-600"></i> 正文结构
+                    <span class="text-sm font-normal text-gray-400">— 点击段落可直接编辑</span>
+                </h3>
+            </div>
+            <div id="bodyStructure" class="space-y-1">
+                <!-- 由 JS 渲染 -->
+            </div>
+        </div>
+
+        <!-- ===== 结尾CTA ===== -->
+        <div class="card p-5 fade-in">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa fa-chevron-circle-right text-green-600"></i> 结尾行动号召 (CTA)
+                </h3>
+                <button onclick="regenerateCTA()" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                    <i class="fa fa-refresh mr-1"></i> 换一个
+                </button>
+            </div>
+            <div id="ctaSection" class="space-y-2">
+                <!-- 由 JS 渲染 -->
+            </div>
+        </div>
+
+        <!-- ===== 推荐标签 ===== -->
+        <div class="card p-5 fade-in">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa fa-hashtag text-pink-500"></i> 推荐标签
+                </h3>
+                <button onclick="regenerateTags()" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                    <i class="fa fa-refresh mr-1"></i> 换一批
+                </button>
+            </div>
+            <div id="tagList" class="flex flex-wrap gap-2">
+                <!-- 由 JS 渲染 -->
+            </div>
+        </div>
+
+        <!-- ===== 平台专属优化 ===== -->
+        <div id="platformOptimization" class="hidden card p-5 fade-in">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa fa-mobile text-blue-500"></i> 平台专属优化
+                </h3>
+            </div>
+            <div id="platformTips" class="space-y-2"></div>
+        </div>
+
+        <!-- ========== 四、辅助功能区 ========== -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 fade-in">
+            <!-- 金句推荐 -->
+            <div class="card p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fa fa-quote-right text-amber-500"></i> 金句推荐
+                    </h3>
+                    <button onclick="showQuotes()" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                        <i class="fa fa-refresh mr-1"></i> 换一批
+                    </button>
+                </div>
+                <div id="quoteList" class="ql-grid">
+                    <!-- 由 JS 渲染 -->
+                </div>
+            </div>
+
+            <!-- BGM 推荐 -->
+            <div class="card p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                        <i class="fa fa-music text-emerald-500"></i> BGM 推荐
+                    </h3>
+                    <button onclick="showBGM()" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                        <i class="fa fa-refresh mr-1"></i> 换一批
+                    </button>
+                </div>
+                <div id="bgmList" class="space-y-2">
+                    <!-- 由 JS 渲染 -->
+                </div>
+            </div>
+        </div>
+
+    </section>
+</main>
+
+<!-- Toast -->
+<div id="toast" class="toast hidden"></div>
+
+<!-- ========== 历史记录弹窗 ========== -->
+<div id="historyModal" class="fixed inset-0 z-50 hidden bg-black/40 backdrop-blur-sm flex items-center justify-center p-4" onclick="if(event.target===this)closeHistory()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col">
+        <div class="flex items-center justify-between p-5 border-b border-gray-100">
+            <h3 class="text-lg font-bold text-gray-800"><i class="fa fa-history mr-2 text-purple-600"></i>编辑历史</h3>
+            <button onclick="closeHistory()" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+        <div id="historyList" class="flex-1 overflow-y-auto p-4 space-y-2">
+            <!-- 由 JS 渲染 -->
+        </div>
+        <div class="p-4 border-t border-gray-100 flex justify-between items-center">
+            <span id="historyCount" class="text-sm text-gray-500"></span>
+            <button onclick="clearHistory()" class="text-sm text-red-500 hover:text-red-700 font-medium">
+                <i class="fa fa-trash-o mr-1"></i> 清空历史
+            </button>
+        </div>
+    </div>
+</div>
+
+<footer class="text-center text-gray-400 text-sm py-8 border-t border-gray-100 mt-12">
+    <i class="fa fa-code mr-1"></i> 热点脚本大纲编辑器 — 内置模板库 + 本地数据驱动
+</footer>
+
+<script>
+// ====================================================================
+//  1. 模板库（10+ 种脚本结构）
+// ====================================================================
+const TEMPLATES = [
+    {
+        id: 'reverse',
+        name: '反转结构',
+        icon: 'fa-random',
+        desc: '问题→误区→真相→行动',
+        match: ['社会事件', '行业动态'],
+        paragraphs: [
+            { label: '问题引入', desc: '描述一个普遍存在的困惑或现象' },
+            { label: '常见误区', desc: '指出大多数人对此的错误认知' },
+            { label: '真相揭示', desc: '给出真正的原因或底层逻辑' },
+            { label: '行动建议', desc: '基于真相给出可操作的行动指南' },
+        ]
+    },
+    {
+        id: 'story',
+        name: '故事结构',
+        icon: 'fa-book',
+        desc: '背景→冲突→转折→结局→启示',
+        match: ['娱乐八卦', '生活方式', '社会事件'],
+        paragraphs: [
+            { label: '背景铺垫', desc: '交代时间、地点、人物背景' },
+            { label: '冲突爆发', desc: '核心矛盾或意外事件出现' },
+            { label: '转折变化', desc: '事情出现意想不到的转机' },
+            { label: '结局呈现', desc: '最终的结果是怎样的' },
+            { label: '启示升华', desc: '从这个故事中我们学到了什么' },
+        ]
+    },
+    {
+        id: 'list',
+        name: '清单结构',
+        icon: 'fa-list',
+        desc: '痛点引入→N个技巧逐一展开',
+        match: ['生活方式', '行业动态'],
+        paragraphs: [
+            { label: '痛点引入', desc: '指出目标人群的共同困扰' },
+            { label: '技巧一', desc: '第一个实用方法/技巧' },
+            { label: '技巧二', desc: '第二个实用方法/技巧' },
+            { label: '技巧三', desc: '第三个实用方法/技巧' },
+            { label: '总结提醒', desc: '要点回顾+注意事项' },
+        ]
+    },
+    {
+        id: 'compare',
+        name: '对比结构',
+        icon: 'fa-balance-scale',
+        desc: 'A方式 vs B方式 → 结论推荐',
+        match: ['行业动态', '科技突破', '生活方式'],
+        paragraphs: [
+            { label: '场景引入', desc: '描述人们面临的常见选择' },
+            { label: '方式A分析', desc: '传统/常见做法的优缺点' },
+            { label: '方式B分析', desc: '新兴/另类做法的优缺点' },
+            { label: '对比总结', desc: '关键维度的对比结论' },
+            { label: '推荐方案', desc: '基于场景推荐最优选择' },
+        ]
+    },
+    {
+        id: 'challenge',
+        name: '挑战结构',
+        icon: 'fa-flag-checkered',
+        desc: '设定目标→过程记录→结果展示',
+        match: ['生活方式', '科技突破'],
+        paragraphs: [
+            { label: '目标设定', desc: '明确要挑战的目标和时限' },
+            { label: '准备阶段', desc: '挑战前的准备工作和预期' },
+            { label: '过程记录', desc: '挑战过程中的关键节点和感受' },
+            { label: '结果展示', desc: '最终成果和数据呈现' },
+            { label: '经验总结', desc: '过程中的收获和避坑指南' },
+        ]
+    },
+    {
+        id: 'tutorial',
+        name: '教程结构',
+        icon: 'fa-graduation-cap',
+        desc: '痛点→工具介绍→步骤演示→效果展示',
+        match: ['科技突破', '行业动态'],
+        paragraphs: [
+            { label: '痛点切入', desc: '指出用户想解决的具体问题' },
+            { label: '工具/方法介绍', desc: '推荐的工具或方法及其优势' },
+            { label: '分步演示', desc: 'step-by-step 操作演示' },
+            { label: '效果展示', desc: '完成后的成果展示' },
+            { label: '注意事项', desc: '常见坑点和进阶技巧' },
+        ]
+    },
+    {
+        id: 'opinion',
+        name: '观点结构',
+        icon: 'fa-microphone',
+        desc: '抛出观点→论据支撑→反驳预期→强化观点',
+        match: ['社会事件', '行业动态', '娱乐八卦'],
+        paragraphs: [
+            { label: '观点抛出', desc: '直接亮出一个有争议或反常识的观点' },
+            { label: '论据一', desc: '第一个支撑观点的论据或案例' },
+            { label: '论据二', desc: '第二个支撑观点的论据或数据' },
+            { label: '反驳预期', desc: '预判并回应可能的反对意见' },
+            { label: '观点强化', desc: '总结升华，强化核心观点' },
+        ]
+    },
+    {
+        id: 'data',
+        name: '数据结构',
+        icon: 'fa-bar-chart',
+        desc: '惊人数据→数据解读→趋势分析→行动建议',
+        match: ['行业动态', '科技突破', '社会事件'],
+        paragraphs: [
+            { label: '数据抛出', desc: '用一个惊人的数据开场吸引注意' },
+            { label: '数据解读', desc: '解释数据背后的含义和背景' },
+            { label: '趋势分析', desc: '从数据中提炼出趋势判断' },
+            { label: '影响评估', desc: '这个趋势对普通人的影响' },
+            { label: '行动建议', desc: '普通人应该如何应对' },
+        ]
+    },
+    {
+        id: 'emotion',
+        name: '情感结构',
+        icon: 'fa-heart',
+        desc: '共鸣引入→故事讲述→情感升华→价值传递',
+        match: ['生活方式', '娱乐八卦', '社会事件'],
+        paragraphs: [
+            { label: '共鸣引入', desc: '描述一个大家都有过的情感体验' },
+            { label: '故事展开', desc: '讲述一个真实细腻的情感故事' },
+            { label: '情感高潮', desc: '故事中最打动人的时刻' },
+            { label: '情绪转折', desc: '从感性到理性的思考转变' },
+            { label: '价值传递', desc: '留下一个让人回味的人生道理' },
+        ]
+    },
+    {
+        id: 'hotspot',
+        name: '热点结构',
+        icon: 'fa-fire',
+        desc: '事件回顾→各方观点→深度分析→我的看法',
+        match: ['社会事件', '娱乐八卦', '行业动态'],
+        paragraphs: [
+            { label: '事件回顾', desc: '简要回顾热点事件的来龙去脉' },
+            { label: '各方观点', desc: '梳理网络上不同的立场和声音' },
+            { label: '深度分析', desc: '从多个维度做深度剖析' },
+            { label: '我的看法', desc: '给出自己的立场和判断' },
+            { label: '互动引导', desc: '邀请观众发表自己的观点' },
+        ]
+    },
+    {
+        id: 'problem',
+        name: '问题解决结构',
+        icon: 'fa-wrench',
+        desc: '问题定义→原因分析→方案给出→效果验证',
+        match: ['科技突破', '行业动态', '生活方式'],
+        paragraphs: [
+            { label: '问题定义', desc: '明确定义要解决的具体问题' },
+            { label: '原因分析', desc: '分析问题产生的根本原因' },
+            { label: '方案给出', desc: '给出切实可行的解决方案' },
+            { label: '效果验证', desc: '展示方案的实际效果' },
+            { label: '适用场景', desc: '说明方案的适用范围和限制' },
+        ]
+    },
+    {
+        id: 'countdown',
+        name: '倒计时结构',
+        icon: 'fa-hourglass',
+        desc: '悬念引入→逐一揭晓→重点讲解→互动引导',
+        match: ['娱乐八卦', '科技突破', '生活方式'],
+        paragraphs: [
+            { label: '悬念引入', desc: '制造期待感，比如"TOP3榜单"' },
+            { label: '第三名', desc: '揭晓第三名并简要说明' },
+            { label: '第二名', desc: '揭晓第二名并深入分析' },
+            { label: '第一名', desc: '揭晓第一名并重点讲解' },
+            { label: '互动引导', desc: '邀请观众分享自己的排名' },
+        ]
+    },
+];
+
+// ====================================================================
+//  2. 金句库（100+）
+// ====================================================================
+const QUOTES = [
+    // 人生成长
+    '人生没有白走的路，每一步都算数。', '种一棵树最好的时间是十年前，其次是现在。',
+    '你的问题在于读书太少而想得太多。', '命运赠送的礼物，早已在暗中标好了价格。',
+    '我们登上并非我们所选择的舞台，演出并非我们所选择的剧本。',
+    '人生最大的遗憾，不是我不行，而是我本可以。',
+    '真正的英雄主义，是在认清生活真相后依然热爱生活。',
+    '不要因为走得太远，而忘了为什么出发。',
+    '所有的被迫选择，其实都是你内心的主动。',
+    '人生不是被给定的，而是被创造的。',
+    // 认知思维
+    '认知决定选择，选择决定命运。', '你永远赚不到认知以外的钱。',
+    '信息差是最大的财富差距。', '最大的风险是不敢冒任何风险。',
+    '大多数人高估了一年的变化，低估了十年的变化。',
+    '与其更好，不如不同。', '第一性原理：追溯到事物最基本的真相。',
+    '幸存者偏差让我们误以为成功有捷径。',
+    '你的眼界决定了你的世界。',
+    '打破认知茧房，才能看到更大的世界。',
+    // 职场成长
+    '不要用战术上的勤奋掩盖战略上的懒惰。',
+    '工作中最大的成本不是犯错，而是不敢犯错。',
+    '你的收入取决于你的不可替代性。',
+    '真正的稳定不是一份铁饭碗，而是走到哪都有饭吃的本领。',
+    '三十岁之前跟对人，三十岁之后做对事。',
+    '职场最大的陷阱是舒适区。',
+    '不要把所有时间卖给一份工作，要留时间投资自己。',
+    '选择比努力更重要，但努力是选择的前提。',
+    // 财富金钱
+    '财富是认知的变现，亏损是认知的缺陷。',
+    '存钱不是为了省钱，而是为了拥有选择权。',
+    '投资最难的不是技术，而是等待的耐心。',
+    '钱不是目的，而是实现自由的工具。',
+    '穷人花时间换钱，富人花钱买时间。',
+    '财富自由的核心不是拥有多少钱，而是被动收入超过支出。',
+    '消费主义最大的谎言是：你值得拥有。',
+    // 情感关系
+    '爱不是寻找完美的人，而是学会欣赏不完美的人。',
+    '最好的关系是相互成就，而不是互相消耗。',
+    '真正的自由不是想做什么就做什么，而是不想做什么就可以不做什么。',
+    '安全感不是来自别人的承诺，而是来自自己的底气。',
+    '所有的关系都是一面镜子，照见的是你自己。',
+    '不要为了合群而失去自己，真正的朋友会喜欢你本来的样子。',
+    // 行动力
+    '想都是问题，做才有答案。', '完成比完美更重要。',
+    '行动是治愈恐惧的良药。', '开始做一件事最好的时间是现在。',
+    '不要等到准备好了再开始，而是在做中不断调整。',
+    '99%的焦虑都源于没有行动。', '微小持续的努力，远胜于间歇性的爆发。',
+    // 社会观察
+    '内卷的本质是同质化竞争，破局的关键是差异化。',
+    '躺平不是放弃，而是对无效内耗的理性拒绝。',
+    '消费降级不是丢人，而是从追求面子到追求里子。',
+    '真正的自由职业不是想做什么就做什么，而是不想做什么就可以不做什么。',
+    '算法推荐让我们活在了信息茧房里。',
+    'AI不会取代你，但会用AI的人会取代你。',
+    '注意力是这个时代最稀缺的资源。',
+    // 创业思维
+    '创业就是从不确定中寻找确定性。',
+    '产品要做得足够好，好到用户愿意主动推荐。',
+    '从0到1远比从1到N更难也更有价值。',
+    '失败不是成功之母，复盘才是。',
+    '最好的商业模式是利他。',
+    '不要追求做大做强，要追求做久做精。',
+    '现金流比利润更重要。',
+    // 短视频创作
+    '前3秒决定用户是否划走。', '情绪价值是短视频的核心竞争力。',
+    '好的内容是给用户一个留下来的理由。',
+    '真实比完美更有感染力。', '互动率比播放量更重要。',
+    '爆款不可复制，但方法论可以复用。',
+    '内容创作的终极目标是建立信任。',
+    // 心态调整
+    '允许一切发生，是一种强大的能力。',
+    '焦虑的反面不是平静，而是具体。',
+    '真正的勇气是带着恐惧依然前行。',
+    '不必太在意别人的看法，因为别人没那么在意你。',
+    '接受自己的普通，然后全力以赴地出众。',
+    '今天是你余生中最年轻的一天。',
+    // 科技AI
+    'AI是工具，不是对手。', '技术不会淘汰人，但会淘汰不学习的人。',
+    '未来已来，只是分布不均。', '人工智能的边界在于人类的想象力。',
+    '用好AI的关键是学会提问。',
+    // 金句补充
+    '所有的伟大都源于一个勇敢的开始。',
+    '世界上唯一不变的就是变化本身。',
+    '人生苦短，别用别人的尺子丈量自己的人生。',
+    '所谓成长，就是把哭声调成静音的过程。',
+    '不要因为别人的节奏而打乱自己的步伐。',
+    '真正的强大不是征服什么，而是能承受什么。',
+    '生活不是等待暴风雨过去，而是学会在雨中跳舞。',
+    '每一个你不满意的现在，都有一个不够努力的曾经。',
+    '世界那么大，先把自己的事做好再说。',
+    '时间不语，却回答了所有问题。',
+    '所有的得失都是最好的安排。',
+    '人这一生，除了生死，其他都是擦伤。',
+    '不要把自己活成别人的期待。',
+    '真正的自由，是拥有被讨厌的勇气。',
+    '人生最大的冒险，就是过自己想要的生活。',
+    '思想是枪，语言是子弹。',
+    '这个世界不缺观点，缺的是证据。',
+    '每一种情绪背后都是一个未被满足的需求。',
+    '你无法用同一水平的思考解决这个水平的问题。',
+    '简单是终极的复杂。',
+];
+
+// ====================================================================
+//  3. BGM 库
+// ====================================================================
+const BGM_LIB = {
+    '反转结构': ['悬疑铺垫风 — 层层递进揭开真相', '反差电子 — 从平静到炸裂的过渡', '暗黑氛围 — 营造悬念和压迫感'],
+    '故事结构': ['叙事钢琴 — 娓娓道来的故事感', '情感弦乐 — 烘托情绪起伏', '治愈系吉他 — 温暖收尾'],
+    '清单结构': ['轻快活泼 — 节奏明快不拖沓', '知识分享风 — 清爽简洁', 'Vlog日常风 — 轻松亲切'],
+    '对比结构': ['电子对比感 — 分段切换明显', '专业分析风 — 冷静客观', '节奏切换 — 随论点变化'],
+    '挑战结构': ['燃系电子 — 激动人心', '运动节奏 — 充满力量感', '励志交响 — 宏大叙事'],
+    '教程结构': ['清新教程风 — 简约不干扰', '学习背景音 — 低注意力占用', '轻快BGM — 保持节奏感'],
+    '观点结构': ['深度谈话风 — 沉稳有力', '智性电子 — 高级感', '轻爵士 — 轻松有思考空间'],
+    '数据结构': ['科技感电子 — 未来感十足', '数据分析风 — 冷静理性', '节奏递进 — 随数据趋势变化'],
+    '情感结构': ['治愈系钢琴 — 温暖走心', '抒情弦乐 — 情感细腻', '氛围白噪音 — 沉浸感'],
+    '热点结构': ['新闻资讯风 — 快速节奏', '讨论感电子 — 营造讨论氛围', '悬念氛围 — 引导深度思考'],
+    '问题解决结构': ['理性分析风 — 逻辑清晰', '轻快电子 — 解决问题后的轻松', '叙事钢琴 — 从容不迫'],
+    '倒计时结构': ['紧张倒计时 — 制造期待', '揭晓时刻风 — 仪式感强', '轻快揭晓 — 轻松有趣'],
+};
+
+const DEFAULT_BGM = ['轻音乐 — 不干扰内容表达', '流行电子 — 保持活跃氛围', '白噪音 — 增加沉浸感'];
+
+// ====================================================================
+//  4. 标签库
+// ====================================================================
+const TAG_POOL = {
+    platform: {
+        '抖音': ['#抖音热门', '#上热门', '#抖音创作', '#抖音爆款', '#抖音运营', '#DOU+', '#抖音小助手', '#抖音短视频'],
+        '视频号': ['#视频号热门', '#视频号创作', '#视频号运营', '#微信视频号', '#视频号爆款', '#视频号涨粉'],
+        'B站': ['#B站热门', '#知识分享', '#B站UP主', '#必火', '#B站创作', '#充电', '#B站推荐'],
+        '小红书': ['#小红书爆款', '#小红书创作', '#小红书运营', '#干货分享', '#日常分享', '#小红书涨粉', '#小红书推荐'],
+        '快手': ['#快手热门', '#快手正能量', '#快手创作', '#快手涨粉', '#快手推荐', '#老铁'],
+    },
+    type: {
+        '社会事件': ['#社会热点', '#民生', '#深度思考', '#社会现象', '#热门话题'],
+        '行业动态': ['#行业分析', '#商业洞察', '#职场干货', '#行业趋势', '#职场进阶'],
+        '娱乐八卦': ['#娱乐热点', '#吃瓜', '#八卦', '#娱乐圈', '#明星'],
+        '科技突破': ['#科技', '#AI', '#黑科技', '#数码', '#未来科技'],
+        '生活方式': ['#生活方式', '#成长', '#自律', '#生活技巧', '#人生感悟'],
+    },
+    audience: {
+        '大众': ['#人人都能看懂', '#接地气'],
+        '年轻人': ['#年轻人', '#Z世代', '#青春'],
+        '职场人': ['#职场', '#打工人', '#职场进阶'],
+        '宝妈': ['#宝妈', '#育儿', '#家庭'],
+        '创业者': ['#创业', '#副业', '#搞钱'],
+    }
+};
+
+// ====================================================================
+//  5. 钩子模板
+// ====================================================================
+const HOOK_TEMPLATES = {
+    '反差': [
+        '说一个反常识的真相：{topic}',
+        '你可能不信，但{topic}的真正原因根本不是你想的那样',
+        '别被表象骗了，{topic}的本质恰恰相反',
+    ],
+    '提问': [
+        '你有没有想过，为什么{topic}？',
+        '{topic}，这个问题困扰了多少人？',
+        '如果{topic}，你会怎么做？',
+    ],
+    '数据': [
+        '数据显示，{topic}的比例高达{num}%',
+        '一组惊人的数据告诉你，{topic}的真相',
+        '{num}%的人都不知道的{topic}内幕',
+    ],
+    '故事': [
+        '昨天我一个朋友跟我说了{topic}的事，听完我沉默了',
+        '讲讲{topic}背后那个不为人知的故事',
+        '事情要从{topic}说起……',
+    ],
+    '共鸣': [
+        '如果你也有{topic}的困扰，这条视频一定要看完',
+        '关于{topic}，你是不是也感同身受？',
+        '说到{topic}，我猜你肯定经历过',
+    ],
+};
+
+// ====================================================================
+//  6. 标题模板
+// ====================================================================
+const TITLE_TEMPLATES = [
+    // 悬念型
+    (t, v, p) => `关于${t}，${p === '大众' ? '90%的人' : '大多数人'}都理解错了`,
+    (t, v, p) => `${t}的真相，终于藏不住了`,
+    // 数字型
+    (t, v, p) => `${t}：${Math.floor(Math.random()*3+3)}个你必须知道的真相`,
+    (t, v, p) => `为了${t}，我花了${Math.floor(Math.random()*9+2)}天做了这件事`,
+    // 对比型
+    (t, v, p) => `同样${t}，为什么有人成功有人失败？`,
+    (t, v, p) => `${t}：普通人和高手的差距在哪里`,
+    // 直给型
+    (t, v, p) => `深度聊聊${t}这件事`,
+    (t, v, p) => `${t}，是时候重新思考了`,
+    // 情绪型
+    (t, v, p) => `看完${t}，我彻底emo了`,
+    (t, v, p) => `${t}让我明白了一个道理`,
+    // 热点型
+    (t, v, p) => `${t}刷屏了！作为${p}你怎么看？`,
+    (t, v, p) => `全网都在聊${t}，我来泼一盆冷水`,
+];
+
+// ====================================================================
+//  7. CTA 模板
+// ====================================================================
+const CTA_TEMPLATES = [
+    (t, p) => `你对${t}怎么看？评论区聊聊 👇`,
+    (t, p) => `觉得有用的话，点赞收藏转发，让更多人看到 👍`,
+    (t, p) => `关注我，每天分享${p}关心的深度内容 🔔`,
+    (t, p) => `你经历过${t}吗？评论区说说你的故事 💬`,
+    (t, p) => `看完有启发？点个关注，我们下期见 ✨`,
+    (t, p) => `如果这条视频对你有帮助，转发给你的朋友一起看看 ➡️`,
+    (t, p) => `关于${t}，你还有什么想了解的？评论区告诉我 📝`,
+    (t, p) => `觉得说得对的点个赞，觉得不对的评论区battle 🎯`,
+];
+
+// ====================================================================
+//  8a. 平台专属优化数据
+// ====================================================================
+const PLATFORM_OPTIMIZATIONS = {
+    '抖音': {
+        tips: [
+            { icon: 'fa-clock-o', text: '时长控制在15-60秒，前3秒必须制造强烈钩子' },
+            { icon: 'fa-music', text: '使用热门BGM和话题标签提升曝光' },
+            { icon: 'fa-arrows', text: '竖屏拍摄(9:16)，文字大而清晰，适配碎片化场景' },
+            { icon: 'fa-bolt', text: '强情绪+快节奏，每5-8秒一个信息点切换' },
+            { icon: 'fa-commenting', text: '评论区维护至关重要，置顶评论引导互动' }
+        ],
+        formatNote: '抖音适合强钩子+快节奏+情绪化表达，信息密度高'
+    },
+    '快手': {
+        tips: [
+            { icon: 'fa-users', text: '更接地气的表达方式，避免过于精致的包装' },
+            { icon: 'fa-heart', text: '真实感 > 精致感，"老铁文化"注重信任建设' },
+            { icon: 'fa-handshake', text: '强互动引导，直播预告+短视频联动' },
+            { icon: 'fa-tag', text: '善用快手话题挑战赛，参与平台活动' },
+            { icon: 'fa-clock-o', text: '时长30-90秒，内容节奏适中，不要太快' }
+        ],
+        formatNote: '快手适合接地气+真实感+信任建设，内容更生活化'
+    },
+    'B站': {
+        tips: [
+            { icon: 'fa-clock-o', text: '时长3-15分钟，深度内容更受欢迎' },
+            { icon: 'fa-file-text', text: '标题党不可取，标题需准确描述内容价值' },
+            { icon: 'fa-list', text: '善用章节标记(00:00-XX:XX)，方便跳转' },
+            { icon: 'fa-comments', text: '弹幕文化是核心，设计互动点和槽点' },
+            { icon: 'fa-graduation-cap', text: '知识密度要高，B站用户对深度内容容忍度高' }
+        ],
+        formatNote: 'B站适合深度内容+知识密度+弹幕互动，3-15分钟中长视频'
+    },
+    '小红书': {
+        tips: [
+            { icon: 'fa-pencil', text: '封面图是关键，文字+图片的视觉风格要精致' },
+            { icon: 'fa-file-text-o', text: '图文+短视频结合，标题含关键词便于搜索' },
+            { icon: 'fa-tags', text: '标签策略重要，每篇笔记5-10个精准标签' },
+            { icon: 'fa-heart', text: '真实个人体验分享 > 专业说教，"利他"是核心' },
+            { icon: 'fa-list-alt', text: '善用清单和教程类格式，收藏率影响权重' }
+        ],
+        formatNote: '小红书适合精致图文+个人体验+利他分享，注重搜索优化'
+    },
+    '视频号': {
+        tips: [
+            { icon: 'fa-wechat', text: '利用微信社交链传播，内容适合转发到群聊和朋友圈' },
+            { icon: 'fa-clock-o', text: '时长1-5分钟，情感类和知识类表现好' },
+            { icon: 'fa-link', text: '可添加公众号链接，适合内容矩阵联动' },
+            { icon: 'fa-users', text: '中老年用户占比高，表达要更温和耐心' },
+            { icon: 'fa-thumbs-up', text: '点赞=推荐给好友，设计值得分享的内容' }
+        ],
+        formatNote: '视频号适合社交传播+情感共鸣+内容矩阵联动'
+    }
+};
+
+// ====================================================================
+//  8b. 系列视频规划数据
+// ====================================================================
+const SERIES_TEMPLATES = {
+    '认知': {
+        titles: [
+            (topic, type) => `第1期：${topic}，你真的了解吗？`,
+            (topic, type) => `第2期：${topic}背后的底层逻辑`,
+            (topic, type) => `第3期：如何利用${topic}改变你的${type === '生活方式' ? '生活' : '认知'}`,
+            (topic, type) => `第4期：${topic}的未来趋势预测`,
+            (topic, type) => `第5期：${topic}给普通人的${Math.floor(Math.random() * 3 + 3)}条建议`
+        ],
+        descriptions: [
+            (topic) => `从"${topic}"这个现象出发，揭示大众认知中的常见误区，建立基础认知。`,
+            (topic) => `深入分析"${topic}"的本质原因和驱动因素，帮观众理解"为什么"。`,
+            (topic) => `从了解到行动，给出普通人可以实际操作的方法论和行动指南。`,
+            (topic) => `前瞻性分析"${topic}"的未来发展趋势，以及我们应该如何提前布局。`,
+            (topic) => `总结核心观点，输出可执行的建议和避坑指南，帮助观众少走弯路。`
+        ]
+    },
+    '故事': {
+        titles: [
+            (topic, type) => `第1期：${topic}的起源故事`,
+            (topic, type) => `第2期：${topic}改变命运的3个真实案例`,
+            (topic, type) => `第3期：${topic}背后你不知道的冷知识`,
+            (topic, type) => `第4期：我亲身经历的${topic}故事`,
+            (topic, type) => `第5期：从${topic}看人性百态`
+        ],
+        descriptions: [
+            (topic) => `用故事化的方式讲述"${topic}"的起源和发展历程，让观众快速进入情境。`,
+            (topic) => `通过3个真实人物案例，展现"${topic}"如何影响和改变普通人的生活。`,
+            (topic) => `揭秘"${topic}"背后鲜为人知的冷知识和趣闻，增加内容的传播性。`,
+            (topic) => `以第一人称视角分享与"${topic}"相关的个人经历，增加真实感和代入感。`,
+            (topic) => `从"${topic}"延伸出去，讨论背后的人性洞察和社会现象，升华主题。`
+        ]
+    },
+    '实战': {
+        titles: [
+            (topic, type) => `第1期：${topic}入门指南`,
+            (topic, type) => `第2期：${topic}的3个核心技巧`,
+            (topic, type) => `第3期：${topic}实操演练（全过程记录）`,
+            (topic, type) => `第4期：${topic}避坑指南`,
+            (topic, type) => `第5期：${topic}进阶玩法`
+        ],
+        descriptions: [
+            (topic) => `为零基础观众提供"${topic}"的入门级教程，降低参与门槛。`,
+            (topic) => `提炼"${topic}"中最核心、最实用的3个技巧，让观众快速上手。`,
+            (topic) => `全过程记录"${topic}"的实际操作过程，展示真实效果和注意事项。`,
+            (topic) => `总结"${topic}"中常见的坑点和误区，帮助观众避免走弯路。`,
+            (topic) => `为有基础的用户提供"${topic}"的进阶技巧和方法，持续深化。`
+        ]
+    },
+    '深度': {
+        titles: [
+            (topic, type) => `第1期：${topic}不完全解读`,
+            (topic, type) => `第2期：${topic}的多维度分析`,
+            (topic, type) => `第3期：${topic}与${pick(['经济','社会','科技','文化','心理'])}的关联`,
+            (topic, type) => `第4期：${topic}的国际对比`,
+            (topic, type) => `第5期：${topic}的终极思考`
+        ],
+        descriptions: [
+            (topic) => `从多个维度全面解读"${topic}"，建立完整的知识框架。`,
+            (topic) => `从经济/社会/文化等多元视角深度分析"${topic}"，呈现复杂全貌。`,
+            (topic) => `探讨"${topic}"与其他领域的关联和相互影响，拓展认知边界。`,
+            (topic) => `对比国内外"${topic}"的不同表现和应对方式，提供更广阔的视野。`,
+            (topic) => `对本系列内容做深度总结和升华，留下引发思考的开放性结论。`
+        ]
+    },
+    '争议': {
+        titles: [
+            (topic, type) => `第1期：${topic}，为什么争议这么大？`,
+            (topic, type) => `第2期：支持${topic}的理由`,
+            (topic, type) => `第3期：反对${topic}的声音`,
+            (topic, type) => `第4期：${topic}的真相到底是什么？`,
+            (topic, type) => `第5期：${topic}，我的最终看法`
+        ],
+        descriptions: [
+            (topic) => `客观呈现"${topic}"引发争议的背景和各方立场，保持中立。`,
+            (topic) => `详细梳理支持"${topic}"的论据和案例，展示一种立场。`,
+            (topic) => `认真倾听反对"${topic}"的声音和理由，展示另一种立场。`,
+            (topic) => `走出情绪化讨论，用事实和数据揭示"${topic}"的客观真相。`,
+            (topic) => `综合所有观点给出自己的判断和立场，引导观众独立思考。`
+        ]
+    }
+};
+
+// ====================================================================
+//  8. 随机数据生成辅助
+// ====================================================================
+function randInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function pickN(arr, n) {
+    const shuffled = [...arr].sort(() => Math.random() - 0.5);
+    return shuffled.slice(0, n);
+}
+
+// ====================================================================
+//  9. localStorage 草稿/历史管理
+// ====================================================================
+const STORAGE_KEY = 'hotspot_script_drafts';
+
+function loadHistory() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
+}
+
+function saveToHistory(data) {
+    const history = loadHistory();
+    history.unshift({
+        ...data,
+        id: Date.now(),
+        savedAt: new Date().toLocaleString('zh-CN'),
+    });
+    // 保留最近 30 条
+    if (history.length > 30) history.length = 30;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
+}
+
+// ====================================================================
+//  10. 模板匹配
+// ====================================================================
+function matchTemplate(type) {
+    // 按匹配度排序：优先匹配热点类型，其次通用
+    const scored = TEMPLATES.map(t => {
+        let score = 0;
+        if (t.match.includes(type)) score += 10;
+        // 默认使用第一个段落数为 4-5 的模板
+        return { template: t, score };
+    });
+    scored.sort((a, b) => b.score - a.score);
+    // 取最高分中的随机一个
+    const topScore = scored[0].score;
+    const top = scored.filter(s => s.score === topScore);
+    return pick(top).template;
+}
+
+// ====================================================================
+//  11. 核心生成函数
+// ====================================================================
+let currentData = null;     // 存储当前生成的完整数据
+
+function getInputs() {
+    return {
+        topic: document.getElementById('topicInput').value.trim(),
+        type: document.getElementById('typeSelect').value,
+        platform: document.getElementById('platformSelect').value,
+        audience: document.getElementById('audienceSelect').value,
+        viewpoint: document.getElementById('viewpointInput').value.trim(),
+    };
+}
+
+function generateOutline() {
+    const inputs = getInputs();
+    if (!inputs.topic) {
+        showToast('请输入热点标题', 'warning');
+        document.getElementById('topicInput').focus();
+        return;
+    }
+
+    // 匹配模板
+    let template = matchTemplate(inputs.type);
+    // 如果有用户选中的模板
+    const activeCard = document.querySelector('.template-card.active');
+    if (activeCard) {
+        const tid = activeCard.dataset.id;
+        const found = TEMPLATES.find(t => t.id === tid);
+        if (found) template = found;
+    }
+
+    // 生成标题方案
+    const titles = generateTitles(inputs);
+
+    // 生成钩子
+    const hooks = generateHooks(inputs);
+
+    // 生成正文
+    const paragraphs = generateParagraphs(inputs, template);
+
+    // 生成 CTA
+    const cta = generateCTA(inputs);
+
+    // 生成标签
+    const tags = generateTags(inputs);
+
+    // 金句
+    const quotes = pickN(QUOTES, 6);
+
+    // BGM
+    const bgm = BGM_LIB[template.name] || DEFAULT_BGM;
+    const bgmPicks = pickN(bgm, 3);
+
+    currentData = {
+        inputs,
+        template: template.name,
+        templateId: template.id,
+        titles,
+        hooks,
+        paragraphs,
+        cta,
+        tags,
+        quotes,
+        bgm: bgmPicks,
+        generatedAt: new Date().toLocaleString('zh-CN'),
+    };
+
+    // 渲染
+    renderTemplateCards(template.id);
+    renderOutput(currentData);
+
+    // 显示输出区
+    const outSec = document.getElementById('outputSection');
+    outSec.classList.remove('hidden');
+    setTimeout(() => outSec.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+    // 保存到历史
+    saveToHistory(currentData);
+    showToast('大纲生成成功 ✅', 'success');
+}
+
+// ---- 标题生成 ----
+function generateTitles(inputs) {
+    const { topic, viewpoint, audience } = inputs;
+    const picked = pickN(TITLE_TEMPLATES, 3);
+    return picked.map(fn => fn(topic, viewpoint, audience));
+}
+
+// ---- 钩子生成 ----
+function generateHooks(inputs) {
+    const { topic } = inputs;
+    const types = pickN(Object.keys(HOOK_TEMPLATES), 5);
+    return types.map(type => {
+        const template = pick(HOOK_TEMPLATES[type]);
+        const text = template
+            .replace(/{topic}/g, topic)
+            .replace(/{num}/g, String(randInt(50, 95)));
+        return { type, text };
+    });
+}
+
+// ---- 正文段落生成 ----
+function generateParagraphs(inputs, template) {
+    const { topic, viewpoint, audience, platform, type } = inputs;
+    const vpSuffix = viewpoint ? `核心观点：${viewpoint}` : '';
+
+    return template.paragraphs.map((p, idx) => {
+        let content = `【${p.label}】${p.desc}`;
+
+        // 根据段落位置和模板类型生成差异化内容
+        if (idx === 0) {
+            // 第一段：引入
+            content = `【${p.label}】从"${topic}"这个现象切入，描述${audience}群体在日常中遇到的真实困惑。${vpSuffix ? ' ' + vpSuffix : ''}`;
+        } else if (idx === template.paragraphs.length - 1) {
+            // 最后一段：总结
+            content = `【${p.label}】总结核心观点：${topic}的本质是${type}领域的一个缩影。给${audience}群体的建议是：从认知到行动，逐步改变。`;
+        } else {
+            // 中间段
+            const keywords = ['深度', '关键', '核心', '本质', '底层', '真实', '有效', '实用'];
+            content = `【${p.label}】围绕"${topic}"展开${pick(keywords)}分析，结合${platform}平台的内容特点，用${audience}群体容易理解的方式进行阐述。`;
+        }
+
+        return { label: p.label, content, desc: p.desc };
+    });
+}
+
+// ---- CTA 生成 ----
+function generateCTA(inputs) {
+    const picked = pickN(CTA_TEMPLATES, 3);
+    return picked.map(fn => fn(inputs.topic, inputs.audience));
+}
+
+// ---- 标签生成 ----
+function generateTags(inputs) {
+    const { platform, type, audience, topic } = inputs;
+    const tags = new Set();
+
+    // 平台标签
+    (TAG_POOL.platform[platform] || []).forEach(t => tags.add(t));
+    // 类型标签
+    (TAG_POOL.type[type] || []).forEach(t => tags.add(t));
+    // 受众标签
+    (TAG_POOL.audience[audience] || []).forEach(t => tags.add(t));
+    // 话题标签
+    tags.add(`#${topic}`);
+    // 通用标签
+    tags.add('#热门话题');
+    tags.add('#内容创作');
+
+    const arr = Array.from(tags);
+    // 随机打乱取前10个
+    return pickN(arr, Math.min(10, arr.length));
+}
+
+// ====================================================================
+//  12. 渲染函数 + 平台优化渲染
+// ====================================================================
+
+function renderPlatformOptimization(platform) {
+    const opt = PLATFORM_OPTIMIZATIONS[platform];
+    if (!opt) return;
+    const section = document.getElementById('platformOptimization');
+    const tips = document.getElementById('platformTips');
+    section.classList.remove('hidden');
+    tips.innerHTML = `
+        <div class="p-4 bg-blue-50 rounded-xl border border-blue-200">
+            <div class="flex items-center gap-2 mb-3">
+                <i class="fa fa-check-circle text-blue-600"></i>
+                <span class="font-semibold text-blue-800">${platform} 优化策略</span>
+                <span class="text-xs text-blue-500">${opt.formatNote}</span>
+            </div>
+            <div class="space-y-2">
+                ${opt.tips.map(t => `
+                    <div class="flex items-start gap-3 p-2 bg-white rounded-lg">
+                        <i class="fa ${t.icon} text-blue-500 mt-0.5 w-4 text-center"></i>
+                        <span class="text-sm text-gray-700">${t.text}</span>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    document.getElementById('platformTag').classList.remove('hidden');
+    document.getElementById('platformTag').innerHTML = `<i class="fa fa-mobile mr-1"></i>${platform}`;
+}
+
+// ---- 模板卡片 ----
+function renderTemplateCards(activeId) {
+    const grid = document.getElementById('templateGrid');
+    const inputs = getInputs();
+    const matched = matchTemplate(inputs.type);
+
+    grid.innerHTML = TEMPLATES.map(t => {
+        const isActive = t.id === activeId;
+        const isMatched = t.id === matched.id;
+        return `
+            <div class="template-card rounded-xl p-3 ${isActive ? 'active' : ''}" data-id="${t.id}" onclick="selectTemplate('${t.id}')">
+                <div class="flex items-center gap-2 mb-1">
+                    <i class="fa ${t.icon} text-purple-600 text-sm"></i>
+                    <span class="font-semibold text-gray-800 text-sm">${t.name}</span>
+                    ${isMatched ? '<span class="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded">推荐</span>' : ''}
+                </div>
+                <p class="text-xs text-gray-500">${t.desc}</p>
+            </div>
+        `;
+    }).join('');
+
+    document.getElementById('matchReason').textContent = `基于「${inputs.type}」类型推荐`;
+}
+
+function selectTemplate(id) {
+    document.querySelectorAll('.template-card').forEach(c => c.classList.remove('active'));
+    const card = document.querySelector(`.template-card[data-id="${id}"]`);
+    if (card) card.classList.add('active');
+
+    // 如果已经有输出了，重新生成
+    if (currentData) {
+        generateOutline();
+    }
+}
+
+// ---- 输出渲染 ----
+function renderOutput(data) {
+    const { inputs, template, titles, hooks, paragraphs, cta, tags, quotes, bgm } = data;
+
+    // 模板名称标签
+    document.getElementById('templateNameTag').textContent = template;
+
+    // 标题
+    renderTitles(titles);
+
+    // 钩子
+    renderHooks(hooks);
+
+    // 正文
+    renderParagraphs(paragraphs);
+
+    // CTA
+    renderCTA(cta);
+
+    // 标签
+    renderTags(tags);
+
+    // 金句
+    renderQuotes(quotes);
+
+    // BGM
+    renderBGM(bgm);
+
+    // 平台优化
+    renderPlatformOptimization(inputs.platform);
+}
+
+function renderTitles(titles) {
+    const list = document.getElementById('titleList');
+    list.innerHTML = titles.map((t, i) => `
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-purple-50 transition-colors group">
+            <span class="w-6 h-6 rounded-full ${i === 0 ? 'gradient-btn' : 'bg-gray-300'} text-white text-xs flex items-center justify-center font-bold">${i + 1}</span>
+            <span contenteditable="true" class="flex-1 text-gray-800 editable text-base">${t}</span>
+            <button onclick="copyText(this.previousElementSibling.textContent)" class="text-gray-400 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-all text-sm" title="复制">
+                <i class="fa fa-copy"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function renderHooks(hooks) {
+    const list = document.getElementById('hookList');
+    const typeLabels = { '反差': 'bg-purple-100 text-purple-700', '提问': 'bg-blue-100 text-blue-700', '数据': 'bg-green-100 text-green-700', '故事': 'bg-orange-100 text-orange-700', '共鸣': 'bg-pink-100 text-pink-700' };
+    list.innerHTML = hooks.map(h => `
+        <div class="flex items-start gap-3 p-3 rounded-xl bg-gray-50 hover:bg-indigo-50 transition-colors group">
+            <span class="hook-badge ${typeLabels[h.type] || 'bg-gray-100 text-gray-700'} whitespace-nowrap">${h.type}</span>
+            <span contenteditable="true" class="flex-1 text-gray-800 editable text-sm leading-relaxed">${h.text}</span>
+            <button onclick="copyText(this.previousElementSibling.textContent)" class="text-gray-400 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-all text-sm mt-0.5" title="复制">
+                <i class="fa fa-copy"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function renderParagraphs(paragraphs) {
+    const container = document.getElementById('bodyStructure');
+    const colors = ['border-purple-500', 'border-blue-500', 'border-emerald-500', 'border-orange-500', 'border-pink-500', 'border-teal-500', 'border-indigo-500'];
+    container.innerHTML = paragraphs.map((p, i) => `
+        <div class="outline-paragraph ${colors[i % colors.length]} p-3 rounded-lg hover:bg-gray-50 transition-colors group" data-idx="${i}">
+            <div class="flex items-start justify-between gap-2 mb-0.5">
+                <span class="font-semibold text-sm text-gray-700">${p.label}</span>
+                <div class="flex gap-1 opacity-0 group-hover:opacity-100 transition-all">
+                    <button onclick="moveParagraph(${i}, -1)" ${i === 0 ? 'disabled' : ''} class="text-gray-400 hover:text-purple-600 text-xs px-1" title="上移"><i class="fa fa-arrow-up"></i></button>
+                    <button onclick="moveParagraph(${i}, 1)" ${i === paragraphs.length - 1 ? 'disabled' : ''} class="text-gray-400 hover:text-purple-600 text-xs px-1" title="下移"><i class="fa fa-arrow-down"></i></button>
+                    <button onclick="removeParagraph(${i})" class="text-gray-400 hover:text-red-500 text-xs px-1" title="删除段落"><i class="fa fa-times"></i></button>
+                    <button onclick="addParagraph(${i})" class="text-gray-400 hover:text-green-600 text-xs px-1" title="在后面插入段落"><i class="fa fa-plus"></i></button>
+                </div>
+            </div>
+            <p contenteditable="true" class="text-gray-600 text-sm editable leading-relaxed whitespace-pre-wrap" data-idx="${i}">${p.content}</p>
+            <p class="text-xs text-gray-400 mt-1 italic">${p.desc}</p>
+        </div>
+    `).join('');
+}
+
+function renderCTA(cta) {
+    const container = document.getElementById('ctaSection');
+    container.innerHTML = cta.map((c, i) => `
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-green-50 hover:bg-green-100 transition-colors group">
+            <span class="text-green-600 font-bold">${i + 1}</span>
+            <span contenteditable="true" class="flex-1 text-gray-800 editable text-sm">${c}</span>
+            <button onclick="copyText(this.previousElementSibling.textContent)" class="text-gray-400 hover:text-green-600 opacity-0 group-hover:opacity-100 transition-all text-sm" title="复制">
+                <i class="fa fa-copy"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+function renderTags(tags) {
+    const container = document.getElementById('tagList');
+    const tagColors = ['bg-purple-100 text-purple-700', 'bg-blue-100 text-blue-700', 'bg-green-100 text-green-700', 'bg-pink-100 text-pink-700', 'bg-orange-100 text-orange-700', 'bg-teal-100 text-teal-700', 'bg-indigo-100 text-indigo-700'];
+    container.innerHTML = tags.map((t, i) => `
+        <span class="px-3 py-1.5 rounded-full text-sm font-medium ${tagColors[i % tagColors.length]} cursor-pointer hover:opacity-80 transition-all" onclick="copyText('${t}')" title="点击复制">
+            ${t}
+        </span>
+    `).join('');
+}
+
+function renderQuotes(quotes) {
+    const container = document.getElementById('quoteList');
+    container.innerHTML = quotes.map(q => `
+        <div class="ql-item relative group" onclick="copyText('${q.replace(/'/g, "\\'").replace(/"/g, '&quot;')}')" title="点击复制金句">
+            <span class="text-amber-500 mr-1">"</span>${q}<span class="text-amber-500 ml-1">"</span>
+            <span class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-white opacity-0 group-hover:opacity-100 transition-all"><i class="fa fa-copy"></i></span>
+        </div>
+    `).join('');
+}
+
+function renderBGM(bgmList) {
+    const container = document.getElementById('bgmList');
+    const icons = ['fa-headphones', 'fa-music', 'fa-soundcloud'];
+    container.innerHTML = bgmList.map((b, i) => `
+        <div class="flex items-center gap-3 p-3 rounded-xl bg-gray-50 hover:bg-emerald-50 transition-colors group">
+            <i class="fa ${icons[i % icons.length]} text-emerald-500 w-5 text-center"></i>
+            <span class="flex-1 text-gray-700 text-sm">${b}</span>
+            <button onclick="copyText('${b.replace(/'/g, "\\'")}')" class="text-gray-400 hover:text-emerald-600 opacity-0 group-hover:opacity-100 transition-all text-sm">
+                <i class="fa fa-copy"></i>
+            </button>
+        </div>
+    `).join('');
+}
+
+// ====================================================================
+//  13. 段落编辑操作（上移/下移/删除/新增）
+// ====================================================================
+function moveParagraph(idx, dir) {
+    if (!currentData) return;
+    const paras = currentData.paragraphs;
+    const target = idx + dir;
+    if (target < 0 || target >= paras.length) return;
+    [paras[idx], paras[target]] = [paras[target], paras[idx]];
+    renderParagraphs(paras);
+}
+
+function removeParagraph(idx) {
+    if (!currentData) return;
+    const paras = currentData.paragraphs;
+    if (paras.length <= 2) { showToast('至少保留2个段落', 'warning'); return; }
+    paras.splice(idx, 1);
+    renderParagraphs(paras);
+    showToast('段落已删除', 'success');
+}
+
+function addParagraph(idx) {
+    if (!currentData) return;
+    const newPara = {
+        label: `新增段落 ${currentData.paragraphs.length + 1}`,
+        content: '在此输入该段落的核心内容……',
+        desc: '可自定义段落说明',
+    };
+    currentData.paragraphs.splice(idx + 1, 0, newPara);
+    renderParagraphs(currentData.paragraphs);
+    showToast('已添加新段落', 'success');
+}
+
+// ====================================================================
+//  14. 重新生成各部分
+// ====================================================================
+function regenerateTitles() {
+    if (!currentData) return;
+    const inputs = currentData.inputs;
+    currentData.titles = generateTitles(inputs);
+    renderTitles(currentData.titles);
+    showToast('标题已更新', 'success');
+}
+
+function regenerateHooks() {
+    if (!currentData) return;
+    const inputs = currentData.inputs;
+    currentData.hooks = generateHooks(inputs);
+    renderHooks(currentData.hooks);
+    showToast('钩子已更新', 'success');
+}
+
+function regenerateCTA() {
+    if (!currentData) return;
+    const inputs = currentData.inputs;
+    currentData.cta = generateCTA(inputs);
+    renderCTA(currentData.cta);
+    showToast('CTA已更新', 'success');
+}
+
+function regenerateTags() {
+    if (!currentData) return;
+    const inputs = currentData.inputs;
+    currentData.tags = generateTags(inputs);
+    renderTags(currentData.tags);
+    showToast('标签已更新', 'success');
+}
+
+function showQuotes() {
+    if (!currentData) return;
+    currentData.quotes = pickN(QUOTES, 6);
+    renderQuotes(currentData.quotes);
+}
+
+function showBGM() {
+    if (!currentData) return;
+    const tpl = currentData.template;
+    const bgmL = BGM_LIB[tpl] || DEFAULT_BGM;
+    currentData.bgm = pickN(bgmL, 3);
+    renderBGM(currentData.bgm);
+}
+
+// ====================================================================
+//  15. 复制 / 导出 / 保存
+// ====================================================================
+function copyText(text) {
+    navigator.clipboard.writeText(text).then(() => {
+        showToast('已复制到剪贴板 ✅', 'success');
+    }).catch(() => {
+        // fallback
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        showToast('已复制到剪贴板 ✅', 'success');
+    });
+}
+
+function copyOutline() {
+    if (!currentData) { showToast('请先生成大纲', 'warning'); return; }
+    const md = buildMarkdown(currentData);
+    copyText(md);
+}
+
+function exportMarkdown() {
+    if (!currentData) { showToast('请先生成大纲', 'warning'); return; }
+    const md = buildMarkdown(currentData);
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `脚本大纲_${currentData.inputs.topic}_${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast('Markdown 已导出 ✅', 'success');
+}
+
+function saveDraft() {
+    if (!currentData) { showToast('请先生成大纲', 'warning'); return; }
+    saveToHistory(currentData);
+    showToast('草稿已保存 ✅', 'success');
+}
+
+function buildMarkdown(data) {
+    const { inputs, template, titles, hooks, paragraphs, cta, tags, quotes, bgm, generatedAt } = data;
+    let md = `# 脚本大纲：${inputs.topic}\n\n`;
+    md += `> 生成时间：${generatedAt}  |  模板：${template}  |  平台：${inputs.platform}  |  受众：${inputs.audience}\n\n`;
+    md += `---\n\n`;
+
+    // 核心信息
+    md += `## 基本信息\n`;
+    md += `- **热点标题**：${inputs.topic}\n`;
+    md += `- **热点类型**：${inputs.type}\n`;
+    md += `- **目标平台**：${inputs.platform}\n`;
+    md += `- **目标受众**：${inputs.audience}\n`;
+    md += `- **核心观点**：${inputs.viewpoint || '（未填写）'}\n`;
+    md += `- **选用模板**：${template}\n\n`;
+    md += `---\n\n`;
+
+    // 标题
+    md += `## 标题方案\n`;
+    titles.forEach((t, i) => { md += `${i + 1}. ${t}\n`; });
+    md += '\n';
+
+    // 钩子
+    md += `## 开头钩子\n`;
+    hooks.forEach(h => { md += `- **[${h.type}]** ${h.text}\n`; });
+    md += '\n';
+
+    // 正文
+    md += `## 正文结构\n`;
+    paragraphs.forEach((p, i) => {
+        md += `### ${p.label}\n`;
+        md += `${p.content}\n\n`;
+    });
+
+    // CTA
+    md += `## 结尾行动号召\n`;
+    cta.forEach((c, i) => { md += `${i + 1}. ${c}\n`; });
+    md += '\n';
+
+    // 标签
+    md += `## 推荐标签\n`;
+    md += tags.join(' ') + '\n\n';
+
+    // 金句
+    md += `## 参考金句\n`;
+    quotes.forEach(q => { md += `- "${q}"\n`; });
+    md += '\n';
+
+    // BGM
+    md += `## BGM 推荐\n`;
+    bgm.forEach(b => { md += `- ${b}\n`; });
+
+    md += `\n---\n> 由热点脚本大纲编辑器生成\n`;
+    return md;
+}
+
+// ====================================================================
+//  16. 历史记录 + 系列视频规划
+// ====================================================================
+
+function generateSeries() {
+    const inputs = getInputs();
+    if (!inputs.topic) {
+        showToast('请先输入热点标题', 'warning');
+        document.getElementById('topicInput').focus();
+        return;
+    }
+
+    const count = parseInt(document.getElementById('seriesCount').value) || 4;
+    const focus = document.getElementById('seriesFocus').value;
+    const template = SERIES_TEMPLATES[focus] || SERIES_TEMPLATES['认知'];
+    const titles = template.titles.slice(0, count);
+    const descriptions = template.descriptions.slice(0, count);
+
+    const outputDiv = document.getElementById('seriesOutput');
+    outputDiv.classList.remove('hidden');
+    outputDiv.innerHTML = `
+        <div class="p-4 bg-purple-50 rounded-xl border border-purple-200 mb-3">
+            <div class="flex items-center gap-2 mb-2">
+                <i class="fa fa-film text-purple-600"></i>
+                <span class="font-semibold text-purple-800">${inputs.topic} 系列规划（${count}期）</span>
+                <span class="text-xs text-purple-500">— ${focus}风格</span>
+            </div>
+            <p class="text-xs text-gray-500">系列视频有助于建立持续的内容矩阵，提高账号粘性和内容深度。</p>
+        </div>
+        ${titles.map((t, i) => `
+            <div class="card p-5 fade-in" style="animation-delay:${i * 0.1}s">
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="font-bold text-gray-800 flex items-center gap-2">
+                        <span class="w-8 h-8 rounded-full gradient-btn text-white text-sm flex items-center justify-center font-bold">${i + 1}</span>
+                        <span class="editable">${t(inputs.topic, inputs.type)}</span>
+                    </h3>
+                    <button onclick="copyText(this.parentElement.querySelector('.editable').textContent)" class="text-sm text-purple-600 hover:text-purple-800 font-medium">
+                        <i class="fa fa-copy mr-1"></i>复制
+                    </button>
+                </div>
+                <div class="p-3 bg-gray-50 rounded-lg">
+                    <h4 class="text-xs font-semibold text-gray-500 mb-1">本期内容定位</h4>
+                    <p class="text-sm text-gray-600 editable">${descriptions[i](inputs.topic)}</p>
+                </div>
+                <div class="mt-3 flex flex-wrap gap-2">
+                    <span class="text-xs bg-purple-100 text-purple-700 px-2 py-1 rounded">建议时长：${(2 + Math.random() * 5).toFixed(1)}分钟</span>
+                    <span class="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">发布时间：第${i + 1}天</span>
+                </div>
+            </div>
+        `).join('')}
+        <div class="mt-3 text-center">
+            <button onclick="saveSeriesDraft()" class="btn-icon bg-purple-100 hover:bg-purple-200 text-purple-700 px-6 py-3">
+                <i class="fa fa-save mr-2"></i>保存系列规划
+            </button>
+        </div>
+    `;
+    showToast(`已生成${count}期系列规划`, 'success');
+}
+
+function saveSeriesDraft() {
+    const seriesHtml = document.getElementById('seriesOutput').innerHTML;
+    if (!seriesHtml) return;
+    saveToHistory({ type: 'series', data: seriesHtml, inputs: getInputs(), savedAt: new Date().toLocaleString('zh-CN') });
+    showToast('系列规划已保存到历史', 'success');
+}
+function showHistory() {
+    const modal = document.getElementById('historyModal');
+    const list = document.getElementById('historyList');
+    const history = loadHistory();
+
+    if (history.length === 0) {
+        list.innerHTML = '<div class="text-center text-gray-400 py-8"><i class="fa fa-inbox text-4xl block mb-2"></i>暂无编辑历史</div>';
+        document.getElementById('historyCount').textContent = '共 0 条记录';
+    } else {
+        list.innerHTML = history.map(h => `
+            <div class="p-4 rounded-xl border border-gray-100 hover:border-purple-200 hover:bg-purple-50/50 transition-all cursor-pointer" onclick="loadFromHistory(${h.id})">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-semibold text-gray-800 truncate max-w-[300px]">${h.inputs?.topic || '未知主题'}</span>
+                    <span class="text-xs text-gray-400">${h.savedAt || ''}</span>
+                </div>
+                <div class="flex gap-2 text-xs text-gray-500">
+                    <span>模板：${h.template || '-'}</span>
+                    <span>平台：${h.inputs?.platform || '-'}</span>
+                    <span>类型：${h.inputs?.type || '-'}</span>
+                </div>
+            </div>
+        `).join('');
+        document.getElementById('historyCount').textContent = `共 ${history.length} 条记录`;
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function closeHistory() {
+    document.getElementById('historyModal').classList.add('hidden');
+}
+
+function loadFromHistory(id) {
+    const history = loadHistory();
+    const item = history.find(h => h.id === id);
+    if (!item) return;
+
+    // 恢复输入
+    if (item.inputs) {
+        document.getElementById('topicInput').value = item.inputs.topic || '';
+        document.getElementById('typeSelect').value = item.inputs.type || '社会事件';
+        document.getElementById('platformSelect').value = item.inputs.platform || '抖音';
+        document.getElementById('audienceSelect').value = item.inputs.audience || '大众';
+        document.getElementById('viewpointInput').value = item.inputs.viewpoint || '';
+    }
+
+    currentData = item;
+    renderTemplateCards(item.templateId);
+    renderOutput(item);
+
+    const outSec = document.getElementById('outputSection');
+    outSec.classList.remove('hidden');
+    setTimeout(() => outSec.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+
+    closeHistory();
+    showToast('已加载历史草稿 ✅', 'success');
+}
+
+function clearHistory() {
+    if (!confirm('确定清空所有编辑历史？')) return;
+    localStorage.removeItem(STORAGE_KEY);
+    closeHistory();
+    showToast('历史已清空', 'success');
+}
+
+// ====================================================================
+//  17. 清空 / 随机灵感 / Toast
+// ====================================================================
+function clearAll() {
+    if (currentData && !confirm('确定清空所有内容？')) return;
+    document.getElementById('topicInput').value = '';
+    document.getElementById('viewpointInput').value = '';
+    document.getElementById('outputSection').classList.add('hidden');
+    currentData = null;
+    renderTemplateCards(null);
+    showToast('已清空', 'success');
+}
+
+function fillInspire() {
+    const examples = [
+        '年轻人开始反向消费', 'AI替代人工引发的职场焦虑', '00后整顿职场现象',
+        '大城市年轻人开始逃离北上广', '副业成为年轻人刚需', '延迟退休引发热议',
+        '躺平与内卷的抉择', '相亲市场的新变化', '年轻人为什么不爱结婚了',
+        '中年危机提前到来', '职场PUA现象分析', '斜杠青年是真实还是泡沫',
+        '租房还是买房的选择', '消费降级还是消费升级', '社交恐惧症成为流行病',
+        '外卖骑手的生存困境', '996工作制的争议', '知识付费是智商税吗',
+        '网红经济的真相', '短视频如何改变生活方式', 'AI绘画会取代设计师吗',
+        'ChatGPT让程序员慌了', '元宇宙是未来还是泡沫', '数字游民的生活靠谱吗',
+    ];
+    document.getElementById('topicInput').value = pick(examples);
+    showToast('已填入灵感话题', 'success');
+}
+
+function showToast(msg, type) {
+    const el = document.getElementById('toast');
+    const colors = { success: 'bg-green-600', warning: 'bg-orange-500', error: 'bg-red-500' };
+    el.className = `toast ${colors[type] || 'bg-gray-800'} text-white px-5 py-3 rounded-xl shadow-2xl text-sm font-medium`;
+    el.innerHTML = msg;
+    el.classList.remove('hidden');
+    clearTimeout(el._timer);
+    el._timer = setTimeout(() => el.classList.add('hidden'), 2500);
+}
+
+// ====================================================================
+//  18. 初始化
+// ====================================================================
+document.addEventListener('DOMContentLoaded', function() {
+    renderTemplateCards(null);
+});
+</script>
+</body>
+</html>

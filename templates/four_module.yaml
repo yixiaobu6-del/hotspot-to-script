@@ -1,0 +1,81 @@
+name: 四模块结构
+description: 破碎与重构 → 核心洞察 → 解决方案 → 润滑剂
+
+modules:
+  - name: 破碎与重构
+    purpose: 问题与时代背景，打破默认剧本
+    techniques:
+      - 砸碎默认剧本
+      - 时代断层
+      - 自我暴露
+    length_ratio: 0.15
+    examples:
+      - "你可能一直被误导了..."
+      - "这不是你的错，而是..."
+
+  - name: 核心洞察
+    purpose: 核心框架（"道"），提供认知升级
+    techniques:
+      - 创造新名词
+      - PAS模型
+      - 跨领域合成
+    length_ratio: 0.25
+    examples:
+      - "本质上是..."
+      - "用X的视角看Y..."
+
+  - name: 解决方案
+    purpose: 框架与工具（"术"），可执行步骤
+    techniques:
+      - 强结构分章
+      - 独特框架
+      - 清晰主线
+    length_ratio: 0.40
+    examples:
+      - "第一步：..."
+      - "具体方法是..."
+
+  - name: 润滑剂
+    purpose: 修辞手法，贯穿全文
+    techniques:
+      - 微故事
+      - 隐喻
+      - 金句
+      - 提问驱动
+    length_ratio: 0.20
+    examples:
+      - "这让我想起..."
+      - "就像..."
+
+platform_adapters:
+  douyin:
+    max_length_seconds: 90
+    hook_time_seconds: 3
+    techniques:
+      - 快节奏
+      - 强钩子
+      - 反转
+      - 情绪化
+
+  xiaohongshu:
+    word_count: 800
+    techniques:
+      - 图文结合
+      - 种草感
+      - emoji
+      - 话题标签
+
+  bilibili:
+    min_length_seconds: 480
+    techniques:
+      - 深度干货
+      - UP主个性
+      - 弹幕互动点
+
+  wechat:
+    word_count: 3000
+    techniques:
+      - 结构化
+      - 可读性
+      - 金句
+      - 引用
